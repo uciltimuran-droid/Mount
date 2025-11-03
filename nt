@@ -1,0 +1,252 @@
+-- G-M V1 ANDROID DELTA FIXED
+-- Paste ONCE in Delta → Press EXECUTE
+-- Fly = Hold W/A/S/D + Space↑ / Ctrl↓
+-- Teleport = Tap any name
+
+local plr = game.Players.LocalPlayer
+local uis = game:GetService("UserInputService")
+local ts = game:GetService("TweenService")
+local rs = game:GetService("RunService")
+
+-- WAIT CHARACTER (ANDROID NEEDS THIS)
+repeat task.wait() until plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+
+-- GUI
+local gui = Instance.new("ScreenGui", plr:WaitForChild("PlayerGui"))
+gui.ResetOnSpawn = false
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0,300,0,380)
+main.Position = UDim2.new(0.5,-150,1.5,0)
+main.BackgroundColor3 = Color3.fromRGB(20,20,35)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+local c = Instance.new("UICorner",main); c.CornerRadius = UDim.new(0,15)
+local s = Instance.new("UIStroke",main); s.Color = Color3.fromRGB(0,170,255); s.Thickness = 3
+
+-- TITLE
+local title = Instance.new("Frame")
+title.Size = UDim2.new(1,0,0,50)
+title.BackgroundColor3 = Color3.fromRGB(30,30,50)
+title.Parent = main
+local tc = Instance.new("UICorner",title); tc.CornerRadius = UDim.new(0,15)
+local tsr = Instance.new("UIStroke",title); tsr.Color = Color3.fromRGB(0,170,255); tsr.Thickness = 2
+
+local label = Instance.new("TextLabel")
+label.Text = "G-M V1"
+label.Size = UDim2.new(1,-60,1,0)
+label.Position = UDim2.new(0,15,0,0)
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.new(1,1,1)
+label.Font = Enum.Font.GothamBold
+label.TextSize = 24
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = title
+
+-- MINIMIZE BUTTON
+local minBtn = Instance.new("TextButton")
+minBtn.Text = "—"
+minBtn.Size = UDim2.new(0,45,0,40)
+minBtn.Position = UDim2.new(1,-50,0.5,-20)
+minBtn.BackgroundColor3 = Color3.fromRGB(80,80,100)
+minBtn.TextColor3 = Color3.new(1,1,1)
+minBtn.Font = Enum.Font.GothamBold
+minBtn.TextSize = 30
+minBtn.Parent = title
+local mc = Instance.new("UICorner",minBtn); mc.CornerRadius = UDim.new(0,10)
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,0,1,-50)
+content.Position = UDim2.new(0,0,0,50)
+content.BackgroundTransparency = 1
+content.Parent = main
+
+local minimized = false
+minBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    content.Visible = not minimized
+    minBtn.Text = minimized and "+" or "—"
+    ts:Create(main,TweenInfo.new(0.3,Enum.EasingStyle.Quart),{
+        Size = minimized and UDim2.new(0,300,0,50) or UDim2.new(0,300,0,380)
+    }):Play()
+end)
+
+-- FLY
+local flyBox = Instance.new("Frame")
+flyBox.Size = UDim2.new(1,-20,0,90)
+flyBox.Position = UDim2.new(0,10,0,10)
+flyBox.BackgroundColor3 = Color3.fromRGB(40,40,60)
+flyBox.Parent = content
+local fc = Instance.new("UICorner",flyBox); fc.CornerRadius = UDim.new(0,12)
+
+local flyTitle = Instance.new("TextLabel")
+flyTitle.Text = "FLY"
+flyTitle.Size = UDim2.new(1,0,0,30)
+flyTitle.BackgroundTransparency = 1
+flyTitle.TextColor3 = Color3.fromRGB(0,220,255)
+flyTitle.Font = Enum.Font.GothamBold
+flyTitle.TextSize = 20
+flyTitle.Parent = flyBox
+
+local toggle = Instance.new("TextButton")
+toggle.Text = "OFF"
+toggle.Size = UDim2.new(0.94,0,0,40)
+toggle.Position = UDim2.new(0.03,0,0.45,0)
+toggle.BackgroundColor3 = Color3.fromRGB(100,30,30)
+toggle.TextColor3 = Color3.new(1,1,1)
+toggle.Font = Enum.Font.GothamBold
+toggle.TextSize = 20
+toggle.Parent = flyBox
+local tc = Instance.new("UICorner",toggle); tc.CornerRadius = UDim.new(0,12)
+
+local speedBox = Instance.new("TextBox")
+speedBox.PlaceholderText = "50"
+speedBox.Text = "50"
+speedBox.Size = UDim2.new(0.6,0,0,30)
+speedBox.Position = UDim2.new(0.2,0,0.8,0)
+speedBox.BackgroundColor3 = Color3.fromRGB(60,60,80)
+speedBox.TextColor3 = Color3.new(1,1,1)
+speedBox.Parent = flyBox
+local sc = Instance.new("UICorner",speedBox); sc.CornerRadius = UDim.new(0,8)
+
+-- FLY LOGIC (ANDROID PROOF)
+local flying = false
+local gyro,vel
+local keys = {}
+
+local function startFly()
+    local root = plr.Character.HumanoidRootPart
+    local hum = plr.Character.Humanoid
+    gyro = Instance.new("BodyGyro",root)
+    gyro.P = 5000
+    gyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+    vel = Instance.new("BodyVelocity",root)
+    vel.MaxForce = Vector3.new(1e5,1e5,1e5)
+    hum.PlatformStand = true
+    flying = true
+    toggle.Text = "ON"
+    toggle.BackgroundColor3 = Color3.fromRGB(30,100,30)
+    
+    rs.Heartbeat:Connect(function()
+        if not flying then return end
+        local cam = workspace.CurrentCamera
+        local move = Vector3.new(
+            (keys.D and 1 or 0) - (keys.A and 1 or 0),
+            (keys.Space and 1 or 0) - (keys.LeftControl and 1 or 0),
+            (keys.S and 1 or 0) - (keys.W and 1 or 0)
+        )
+        if move.Magnitude > 0 then
+            vel.Velocity = (cam.CFrame:VectorToWorldSpace(move)) * (tonumber(speedBox.Text) or 50)
+        else
+            vel.Velocity = Vector3.new()
+        end
+        gyro.CFrame = cam.CFrame
+    end)
+end
+
+local function stopFly()
+    flying = false
+    if gyro then gyro:Destroy() end
+    if vel then vel:Destroy() end
+    plr.Character.Humanoid.PlatformStand = false
+    toggle.Text = "OFF"
+    toggle.BackgroundColor3 = Color3.fromRGB(100,30,30)
+end
+
+toggle.MouseButton1Click:Connect(function()
+    if flying then stopFly() else startFly() end
+end)
+
+-- KEYS (ANDROID TOUCH KEYBOARD WORKS)
+uis.InputBegan:Connect(function(i,gp)
+    if gp then return end
+    local k = i.KeyCode
+    if k == Enum.KeyCode.W then keys.W = true
+    elseif k == Enum.KeyCode.A then keys.A = true
+    elseif k == Enum.KeyCode.S then keys.S = true
+    elseif k == Enum.KeyCode.D then keys.D = true
+    elseif k == Enum.KeyCode.Space then keys.Space = true
+    elseif k == Enum.KeyCode.LeftControl then keys.LeftControl = true
+    end
+end)
+
+uis.InputEnded:Connect(function(i)
+    local k = i.KeyCode
+    if k == Enum.KeyCode.W then keys.W = false
+    elseif k == Enum.KeyCode.A then keys.A = false
+    elseif k == Enum.KeyCode.S then keys.S = false
+    elseif k == Enum.KeyCode.D then keys.D = false
+    elseif k == Enum.KeyCode.Space then keys.Space = false
+    elseif k == Enum.KeyCode.LeftControl then keys.LeftControl = false
+    end
+end)
+
+-- TELEPORT LIST
+local tpTitle = Instance.new("TextLabel")
+tpTitle.Text = "TELEPORT"
+tpTitle.Size = UDim2.new(1,-20,0,30)
+tpTitle.Position = UDim2.new(0,10,0,110)
+tpTitle.BackgroundTransparency = 1
+tpTitle.TextColor3 = Color3.fromRGB(0,220,255)
+tpTitle.Font = Enum.Font.GothamBold
+tpTitle.TextSize = 20
+tpTitle.Parent = content
+
+local list = Instance.new("ScrollingFrame")
+list.Size = UDim2.new(1,-20,0,210)
+list.Position = UDim2.new(0,10,0,150)
+list.BackgroundColor3 = Color3.fromRGB(35,35,55)
+list.ScrollBarThickness = 8
+list.Parent = content
+local lc = Instance.new("UICorner",list); lc.CornerRadius = UDim.new(0,12)
+local ll = Instance.new("UIListLayout",list)
+ll.Padding = UDim.new(0,6)
+
+local function refresh()
+    list:ClearAllChildren()
+    ll.Parent = nil
+    for _,p in pairs(game.Players:GetPlayers()) do
+        if p ~= plr then
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1,0,0,40)
+            b.BackgroundColor3 = Color3.fromRGB(55,55,80)
+            b.Text = p.DisplayName.." (@"+p.Name+")"
+            b.TextColor3 = Color3.new(1,1,1)
+            b.Font = Enum.Font.Gotham
+            b.TextSize = 16
+            b.Parent = list
+            local bc = Instance.new("UICorner",b); bc.CornerRadius = UDim.new(0,10)
+            b.MouseButton1Click:Connect(function()
+                if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    plr.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(0,4,4)
+                    if vel then vel.Velocity = Vector3.new() end
+                end
+            end)
+        end
+    end
+    ll.Parent = list
+    list.CanvasSize = UDim2.new(0,0,0,ll.AbsoluteContentSize.Y+10)
+end
+refresh()
+game.Players.PlayerAdded:Connect(refresh)
+game.Players.PlayerRemoving:Connect(refresh)
+
+-- RESPAWN FIX
+plr.CharacterAdded:Connect(function()
+    task.wait(1)
+    stopFly()
+end)
+
+-- OPEN ANIMATION
+ts:Create(main,TweenInfo.new(0.6,Enum.EasingStyle.Back),{
+    Position = UDim2.new(0.5,-150,0.5,-190)
+}):Play()
+
+-- DONE
+game.StarterGui:SetCore("SendNotification",{
+    Title = "G-M V1";
+    Text = "Loaded! Tap — to minimize";
+    Duration = 4;
+})
