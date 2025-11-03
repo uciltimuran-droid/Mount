@@ -1,0 +1,267 @@
+-- G-M V1 MOBILE ANALOG EDITION
+-- FLY = USE YOUR LEFT JOYSTICK (the one you walk with)
+-- UP = DOUBLE-TAP JUMP BUTTON
+-- DOWN = HOLD CROUCH BUTTON
+-- NO KEYBOARD NEEDED
+-- TELEPORT = FULL LIST + WORKS WHILE FLYING
+
+local plr = game.Players.LocalPlayer
+local cam = workspace.CurrentCamera
+local TS = game:GetService("TweenService")
+local RS = game:GetService("RunService")
+local Core = game:GetService("CoreGui")
+
+-- GUI IN CORE (DELTA CAN'T HIDE)
+local gui = Instance.new("ScreenGui")
+gui.Name = "GMV1_MOBILE"
+gui.ResetOnSpawn = false
+gui.Parent = Core
+
+game.StarterGui:SetCore("SendNotification",{
+    Title="G-M V1 MOBILE";
+    Text="LOADED! Use joystick to fly";
+    Duration=6;
+})
+
+-- MAIN PANEL
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0,330,0,440)
+main.Position = UDim2.new(0.5,-165,1.3,0)
+main.BackgroundColor3 = Color3.fromRGB(15,15,30)
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+local mc = Instance.new("UICorner",main); mc.CornerRadius = UDim.new(0,18)
+local ms = Instance.new("UIStroke",main); ms.Color = Color3.fromRGB(0,220,255); ms.Thickness = 3
+
+-- TITLE
+local title = Instance.new("TextLabel")
+title.Text = "G-M V1 MOBILE"
+title.Size = UDim2.new(1,0,0,55)
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 26
+title.Parent = main
+
+-- MINIMIZE
+local min = Instance.new("TextButton")
+min.Text = "—"
+min.Size = UDim2.new(0,55,0,50)
+min.Position = UDim2.new(1,-60,0,2)
+min.BackgroundColor3 = Color3.fromRGB(90,90,110)
+min.TextColor3 = Color3.new(1,1,1)
+min.Font = Enum.Font.GothamBold
+min.TextSize = 32
+min.Parent = main
+local minc = Instance.new("UICorner",min); minc.CornerRadius = UDim.new(0,12)
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,0,1,-55)
+content.Position = UDim2.new(0,0,0,55)
+content.BackgroundTransparency = 1
+content.Parent = main
+
+local minimized = false
+min.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    content.Visible = not minimized
+    min.Text = minimized and "+" or "—"
+    TS:Create(main,TweenInfo.new(0.3),{
+        Size = minimized and UDim2.new(0,330,0,55) or UDim2.new(0,330,0,440)
+    }):Play()
+end)
+
+-- FLY BOX
+local flybox = Instance.new("Frame")
+flybox.Size = UDim2.new(0.9,0,0,110)
+flybox.Position = UDim2.new(0.05,0,0,10)
+flybox.BackgroundColor3 = Color3.fromRGB(35,35,60)
+flybox.Parent = content
+local fbc = Instance.new("UICorner",flybox); fbc.CornerRadius = UDim.new(0,14)
+
+local flytitle = Instance.new("TextLabel")
+flytitle.Text = "FLY = LEFT JOYSTICK"
+flytitle.Size = UDim2.new(1,0,0,35)
+flytitle.BackgroundTransparency = 1
+flytitle.TextColor3 = Color3.fromRGB(0,255,255)
+flytitle.Font = Enum.Font.GothamBold
+flytitle.TextSize = 20
+flytitle.Parent = flybox
+
+local flybtn = Instance.new("TextButton")
+flybtn.Text = "FLY OFF"
+flybtn.Size = UDim2.new(1,-20,0,45)
+flybtn.Position = UDim2.new(0,10,0.4,0)
+flybtn.BackgroundColor3 = Color3.fromRGB(130,40,40)
+flybtn.TextColor3 = Color3.new(1,1,1)
+flybtn.Font = Enum.Font.GothamBold
+flybtn.TextSize = 22
+flybtn.Parent = flybox
+local btnc = Instance.new("UICorner",flybtn); btnc.CornerRadius = UDim.new(0,12)
+
+local speed = Instance.new("TextBox")
+speed.Text = "80"
+speed.PlaceholderText = "Speed"
+speed.Size = UDim2.new(1,-20,0,35)
+speed.Position = UDim2.new(0,10,0.78,0)
+speed.BackgroundColor3 = Color3.fromRGB(60,60,85)
+speed.TextColor3 = Color3.new(1,1,1)
+speed.Parent = flybox
+local spc = Instance.new("UICorner",speed); spc.CornerRadius = UDim.new(0,10)
+
+-- TP BOX
+local tpbox = Instance.new("Frame")
+tpbox.Size = UDim2.new(0.9,0,0,260)
+tpbox.Position = UDim2.new(0.05,0,0,130)
+tpbox.BackgroundColor3 = Color3.fromRGB(30,30,55)
+tpbox.Parent = content
+local tpc = Instance.new("UICorner",tpbox); tpc.CornerRadius = UDim.new(0,14)
+
+local tptitle = Instance.new("TextLabel")
+tptitle.Text = "TAP NAME TO TP"
+tptitle.Size = UDim2.new(1,0,0,35)
+tptitle.BackgroundTransparency = 1
+tptitle.TextColor3 = Color3.fromRGB(0,255,255)
+tptitle.Font = Enum.Font.GothamBold
+tptitle.TextSize = 20
+tptitle.Parent = tpbox
+
+local list = Instance.new("ScrollingFrame")
+list.Size = UDim2.new(1,-20,1,-45)
+list.Position = UDim2.new(0,10,0,35)
+list.BackgroundTransparency = 1
+list.ScrollBarThickness = 8
+list.Parent = tpbox
+local lay = Instance.new("UIListLayout",list)
+lay.Padding = UDim.new(0,6)
+
+-- FLY LOGIC (100% MOBILE)
+local flying = false
+local bv, bg
+local moveVec = Vector2.new(0,0)
+local upDown = 0
+
+local function startFly()
+    local root = plr.Character:FindFirstChild("HumanoidRootPart")
+    local hum = plr.Character:FindFirstChild("Humanoid")
+    if not root or not hum then return end
+    
+    stopFly()
+    
+    bg = Instance.new("BodyGyro", root)
+    bg.MaxTorque = Vector3.new(5e5,5e5,5e5)
+    bg.P = 4e4
+    
+    bv = Instance.new("BodyVelocity", root)
+    bv.MaxForce = Vector3.new(5e5,5e5,5e5)
+    bv.Velocity = Vector3.new()
+    
+    hum.PlatformStand = true
+    flying = true
+    flybtn.Text = "FLY ON"
+    flybtn.BackgroundColor3 = Color3.fromRGB(40,130,40)
+    
+    RS.Heartbeat:Connect(function()
+        if not flying then return end
+        local spd = tonumber(speed.Text) or 80
+        local camCf = cam.CFrame
+        
+        -- LEFT JOYSTICK = FORWARD / SIDE
+        local forward = camCf.LookVector * -moveVec.Y
+        local right = camCf.RightVector * moveVec.X
+        local horiz = (forward + right).Unit * spd
+        
+        -- UP / DOWN
+        local vert = Vector3.new(0, upDown * spd, 0)
+        
+        bv.Velocity = horiz + vert
+        bg.CFrame = camCf
+    end)
+end
+
+local function stopFly()
+    flying = false
+    if bv then bv:Destroy() end
+    if bg then bg:Destroy() end
+    if plr.Character and plr.Character:FindFirstChild("Humanoid") then
+        plr.Character.Humanoid.PlatformStand = false
+    end
+    flybtn.Text = "FLY OFF"
+    flybtn.BackgroundColor3 = Color3.fromRGB(130,40,40)
+end
+
+flybtn.MouseButton1Click:Connect(function()
+    if flying then stopFly() else startFly() end
+end)
+
+-- READ MOBILE JOYSTICK (ContextActionService)
+local CAS = game:GetService("ContextActionService")
+
+local function handleMove(action, state, input)
+    if action ~= "Move" then return end
+    if state == Enum.UserInputState.Begin or state == Enum.UserInputState.Change then
+        moveVec = input.Position
+    elseif state == Enum.UserInputState.End then
+        moveVec = Vector2.new(0,0)
+    end
+end
+
+CAS:BindAction("MobileMove", handleMove, false, Enum.PlayerActions.Move)
+
+-- UP = DOUBLE TAP JUMP
+local lastJump = 0
+CAS:BindAction("MobileJump", function(_, state)
+    if state == Enum.UserInputState.Begin then
+        local now = tick()
+        if now - lastJump < 0.4 then
+            upDown = 1
+            task.delay(0.3, function() if upDown == 1 then upDown = 0 end end)
+        end
+        lastJump = now
+    end
+end, false, Enum.PlayerActions.Jump)
+
+-- DOWN = HOLD CROUCH
+CAS:BindAction("MobileCrouch", function(_, state)
+    upDown = state == Enum.UserInputState.Begin and -1 or 0
+end, false, Enum.PlayerActions.Crouch)
+
+-- TELEPORT LIST (FULL + AUTO REFRESH)
+local function refresh()
+    list:ClearAllChildren()
+    for _, p in ipairs(game.Players:GetPlayers()) do
+        if p ~= plr and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1,0,0,40)
+            btn.BackgroundColor3 = Color3.fromRGB(70,70,95)
+            btn.Text = p.DisplayName .. " (@"..p.Name..")"
+            btn.TextColor3 = Color3.new(1,1,1)
+            btn.Font = Enum.Font.Gotham
+            btn.Parent = list
+            local bc = Instance.new("UICorner",btn); bc.CornerRadius = UDim.new(0,10)
+            btn.MouseButton1Click:Connect(function()
+                plr.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(0,6,6)
+                if bv then bv.Velocity = Vector3.new() end
+            end)
+        end
+    end
+    list.CanvasSize = UDim2.new(0,0,0,lay.AbsoluteContentSize.Y + 10)
+end
+refresh()
+game.Players.PlayerAdded:Connect(refresh)
+game.Players.PlayerRemoving:Connect(refresh)
+
+-- RESPAWN
+plr.CharacterAdded:Connect(function()
+    task.wait(1)
+    stopFly()
+    refresh()
+end)
+
+-- ANIMATION
+TS:Create(main, TweenInfo.new(0.7, Enum.EasingStyle.Back), {
+    Position = UDim2.new(0.5,-165,0.5,-220)
+}):Play()
+
+print("G-M V1 MOBILE READY - USE JOYSTICK!")
