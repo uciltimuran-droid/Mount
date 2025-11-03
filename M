@@ -1,0 +1,259 @@
+-- G-M V1 Panel Script for Roblox
+-- Features: Fly (toggle, adjustable speed), Teleport to players
+-- UI: Simple, cool dark theme, draggable, minimizable, animation on load
+
+local player = game.Players.LocalPlayer
+local gui = Instance.new("ScreenGui")
+gui.Name = "GMV1"
+gui.Parent = player:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 250, 0, 300)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -150)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true  -- Makes it slidable/draggable
+mainFrame.Parent = gui
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+titleBar.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Text = "G-M V1"
+titleLabel.Size = UDim2.new(1, -30, 1, 0)
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextSize = 18
+titleLabel.Parent = titleBar
+
+-- Minimize Button
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Text = "-"
+minimizeButton.Size = UDim2.new(0, 30, 1, 0)
+minimizeButton.Position = UDim2.new(1, -30, 0, 0)
+minimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeButton.Font = Enum.Font.SourceSansBold
+minimizeButton.TextSize = 18
+minimizeButton.Parent = titleBar
+
+local isMinimized = false
+minimizeButton.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        mainFrame.Size = UDim2.new(0, 250, 0, 30)
+        minimizeButton.Text = "+"
+    else
+        mainFrame.Size = UDim2.new(0, 250, 0, 300)
+        minimizeButton.Text = "-"
+    end
+end)
+
+-- Content Frame
+local contentFrame = Instance.new("Frame")
+contentFrame.Name = "Content"
+contentFrame.Size = UDim2.new(1, 0, 1, -30)
+contentFrame.Position = UDim2.new(0, 0, 0, 30)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = mainFrame
+
+-- Fly Section
+local flyLabel = Instance.new("TextLabel")
+flyLabel.Text = "Fly"
+flyLabel.Size = UDim2.new(1, 0, 0, 25)
+flyLabel.BackgroundTransparency = 1
+flyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+flyLabel.Font = Enum.Font.SourceSans
+flyLabel.TextSize = 16
+flyLabel.Parent = contentFrame
+
+local flyToggle = Instance.new("TextButton")
+flyToggle.Text = "Off"
+flyToggle.Size = UDim2.new(0.5, 0, 0, 25)
+flyToggle.Position = UDim2.new(0, 0, 0, 25)
+flyToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyToggle.Parent = contentFrame
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Text = "Speed:"
+speedLabel.Size = UDim2.new(0.3, 0, 0, 25)
+speedLabel.Position = UDim2.new(0.5, 0, 0, 25)
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+speedLabel.Font = Enum.Font.SourceSans
+speedLabel.TextSize = 16
+speedLabel.Parent = contentFrame
+
+local speedBox = Instance.new("TextBox")
+speedBox.Text = "50"
+speedBox.Size = UDim2.new(0.2, 0, 0, 25)
+speedBox.Position = UDim2.new(0.8, 0, 0, 25)
+speedBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBox.Parent = contentFrame
+
+-- Fly Logic
+local flying = false
+local flySpeed = 50
+local keys = {W = false, A = false, S = false, D = false, Space = false, LeftControl = false}
+local humanoid = player.Character:WaitForChild("Humanoid")
+local root = player.Character:WaitForChild("HumanoidRootPart")
+
+local function startFly()
+    flying = true
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "FlyGyro"
+    bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bg.P = 9e4
+    bg.Parent = root
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "FlyVelocity"
+    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Parent = root
+
+    humanoid.PlatformStand = true
+
+    spawn(function()
+        while flying do
+            flySpeed = tonumber(speedBox.Text) or 50
+            local cam = workspace.CurrentCamera
+            local dir = Vector3.new(0, 0, 0)
+            if keys.W then dir = dir + cam.CFrame.LookVector end
+            if keys.S then dir = dir - cam.CFrame.LookVector end
+            if keys.A then dir = dir - cam.CFrame.RightVector end
+            if keys.D then dir = dir + cam.CFrame.RightVector end
+            if keys.Space then dir = dir + Vector3.new(0, 1, 0) end
+            if keys.LeftControl then dir = dir - Vector3.new(0, 1, 0) end
+
+            if dir.Magnitude > 0 then
+                dir = dir.Unit
+            end
+            bv.Velocity = dir * flySpeed
+            bg.CFrame = cam.CFrame
+            wait()
+        end
+        humanoid.PlatformStand = false
+        if root:FindFirstChild("FlyGyro") then root.FlyGyro:Destroy() end
+        if root:FindFirstChild("FlyVelocity") then root.FlyVelocity:Destroy() end
+    end)
+end
+
+local function stopFly()
+    flying = false
+end
+
+flyToggle.MouseButton1Click:Connect(function()
+    if flying then
+        stopFly()
+        flyToggle.Text = "Off"
+        flyToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    else
+        startFly()
+        flyToggle.Text = "On"
+        flyToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    end
+end)
+
+-- Key Input for Fly Movement
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if flying then
+        if input.KeyCode == Enum.KeyCode.W then keys.W = true end
+        if input.KeyCode == Enum.KeyCode.A then keys.A = true end
+        if input.KeyCode == Enum.KeyCode.S then keys.S = true end
+        if input.KeyCode == Enum.KeyCode.D then keys.D = true end
+        if input.KeyCode == Enum.KeyCode.Space then keys.Space = true end
+        if input.KeyCode == Enum.KeyCode.LeftControl then keys.LeftControl = true end
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if flying then
+        if input.KeyCode == Enum.KeyCode.W then keys.W = false end
+        if input.KeyCode == Enum.KeyCode.A then keys.A = false end
+        if input.KeyCode == Enum.KeyCode.S then keys.S = false end
+        if input.KeyCode == Enum.KeyCode.D then keys.D = false end
+        if input.KeyCode == Enum.KeyCode.Space then keys.Space = false end
+        if input.KeyCode == Enum.KeyCode.LeftControl then keys.LeftControl = false end
+    end
+end)
+
+-- Teleport Section
+local tpLabel = Instance.new("TextLabel")
+tpLabel.Text = "Teleport to Player"
+tpLabel.Size = UDim2.new(1, 0, 0, 25)
+tpLabel.Position = UDim2.new(0, 0, 0, 60)
+tpLabel.BackgroundTransparency = 1
+tpLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+tpLabel.Font = Enum.Font.SourceSans
+tpLabel.TextSize = 16
+tpLabel.Parent = contentFrame
+
+local playerList = Instance.new("ScrollingFrame")
+playerList.Size = UDim2.new(1, 0, 1, -85)
+playerList.Position = UDim2.new(0, 0, 0, 85)
+playerList.BackgroundTransparency = 1
+playerList.ScrollBarThickness = 5
+playerList.Parent = contentFrame
+
+local function updatePlayerList()
+    for _, child in ipairs(playerList:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local uiListLayout = Instance.new("UIListLayout")
+    uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    uiListLayout.Parent = playerList
+    
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr ~= player then
+            local btn = Instance.new("TextButton")
+            btn.Text = plr.Name
+            btn.Size = UDim2.new(1, 0, 0, 25)
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Parent = playerList
+            btn.MouseButton1Click:Connect(function()
+                if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    root.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 0, 3)  -- Slight offset
+                end
+            end)
+        end
+    end
+end
+
+updatePlayerList()
+game.Players.PlayerAdded:Connect(updatePlayerList)
+game.Players.PlayerRemoving:Connect(updatePlayerList)
+
+-- Animation on Load
+mainFrame.Position = UDim2.new(0.5, -125, 1.5, 0)  -- Start offscreen bottom
+local tweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local tween = tweenService:Create(mainFrame, tweenInfo, {Position = UDim2.new(0.5, -125, 0.5, -150)})
+tween:Play()
+
+-- Optional: Add corner radius for cool look
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 5)
+uiCorner.Parent = mainFrame
+uiCorner:Clone().Parent = titleBar
+uiCorner:Clone().Parent = flyToggle
+uiCorner:Clone().Parent = minimizeButton
+uiCorner:Clone().Parent = speedBox
+
+-- For player list buttons, add in loop if desired
