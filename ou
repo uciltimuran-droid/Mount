@@ -1,0 +1,451 @@
+-- G-M V1 Panel Script for Roblox - Fixed Version
+-- Features: Fly (toggle, adjustable speed, WASD/Space/Ctrl movement), Teleport to players
+-- Fixes: Proper character respawn handling, teleport works during fly, movement works
+-- UI: Attractive dark neon theme, hovers, gradients, strokes, better layout
+
+local player = game.Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "GMV1"
+gui.Parent = player:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+-- Variables
+local flying = false
+local flySpeed = 50
+local keys = {W = false, A = false, S = false, D = false, Space = false, LeftControl = false}
+local BodyGyro = nil
+local BodyVelocity = nil
+local flyConnection = nil
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 280, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -140, 1.5, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = gui
+
+-- UICorner and UIStroke for main frame
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = mainFrame
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(100, 150, 255)
+mainStroke.Thickness = 2
+mainStroke.Transparency = 0.3
+mainStroke.Parent = mainFrame
+
+-- UIGradient for main frame
+local mainGradient = Instance.new("UIGradient")
+mainGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 25, 45)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 30))
+}
+mainGradient.Rotation = 135
+mainGradient.Parent = mainFrame
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = Color3.fromRGB(35, 30, 50)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.Parent = titleBar
+
+local titleStroke = Instance.new("UIStroke")
+titleStroke.Color = Color3.fromRGB(120, 170, 255)
+titleStroke.Thickness = 1.5
+titleStroke.Parent = titleBar
+
+local titleGradient = Instance.new("UIGradient")
+titleGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 40, 70)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 25, 50))
+}
+titleGradient.Rotation = 90
+titleGradient.Parent = titleBar
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Text = "G-M V1"
+titleLabel.Size = UDim2.new(1, -50, 1, 0)
+titleLabel.Position = UDim2.new(0, 15, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 20
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+-- Minimize Button
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Text = "-"
+minimizeButton.Size = UDim2.new(0, 35, 0, 35)
+minimizeButton.Position = UDim2.new(1, -40, 0.5, -17.5)
+minimizeButton.BackgroundColor3 = Color3.fromRGB(60, 50, 80)
+minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeButton.Font = Enum.Font.GothamBold
+minimizeButton.TextSize = 20
+minimizeButton.Parent = titleBar
+
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 8)
+minCorner.Parent = minimizeButton
+
+local minStroke = Instance.new("UIStroke")
+minStroke.Color = Color3.fromRGB(80, 70, 100)
+minStroke.Thickness = 1
+minStroke.Parent = minimizeButton
+
+local isMinimized = false
+minimizeButton.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and UDim2.new(0, 280, 0, 40) or UDim2.new(0, 280, 0, 350)
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(mainFrame, tweenInfo, {Size = targetSize})
+    tween:Play()
+    minimizeButton.Text = isMinimized and "+" or "-"
+end)
+
+-- Hover for minimize
+minimizeButton.MouseEnter:Connect(function()
+    minimizeButton.BackgroundColor3 = Color3.fromRGB(80, 70, 100)
+end)
+minimizeButton.MouseLeave:Connect(function()
+    minimizeButton.BackgroundColor3 = Color3.fromRGB(60, 50, 80)
+end)
+
+-- Content Frame
+local contentFrame = Instance.new("Frame")
+contentFrame.Name = "Content"
+contentFrame.Size = UDim2.new(1, 0, 1, -40)
+contentFrame.Position = UDim2.new(0, 0, 0, 40)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = mainFrame
+
+-- Fly Section Frame
+local flySection = Instance.new("Frame")
+flySection.Size = UDim2.new(1, -20, 0, 70)
+flySection.Position = UDim2.new(0, 10, 0, 10)
+flySection.BackgroundColor3 = Color3.fromRGB(40, 35, 55)
+flySection.Parent = contentFrame
+
+local flySectionCorner = Instance.new("UICorner")
+flySectionCorner.CornerRadius = UDim.new(0, 8)
+flySectionCorner.Parent = flySection
+
+local flySectionStroke = Instance.new("UIStroke")
+flySectionStroke.Color = Color3.fromRGB(70, 60, 90)
+flySectionStroke.Thickness = 1
+flySectionStroke.Parent = flySection
+
+local flyLabel = Instance.new("TextLabel")
+flyLabel.Text = "Fly"
+flyLabel.Size = UDim2.new(1, 0, 0, 25)
+flyLabel.Position = UDim2.new(0, 0, 0, 5)
+flyLabel.BackgroundTransparency = 1
+flyLabel.TextColor3 = Color3.fromRGB(180, 200, 255)
+flyLabel.Font = Enum.Font.GothamSemibold
+flyLabel.TextSize = 18
+flyLabel.Parent = flySection
+
+local flyToggle = Instance.new("TextButton")
+flyToggle.Text = "OFF"
+flyToggle.Size = UDim2.new(0.48, 0, 0, 35)
+flyToggle.Position = UDim2.new(0, 5, 0, 35)
+flyToggle.BackgroundColor3 = Color3.fromRGB(70, 40, 40)
+flyToggle.TextColor3 = Color3.fromRGB(255, 200, 200)
+flyToggle.Font = Enum.Font.GothamBold
+flyToggle.TextSize = 16
+flyToggle.Parent = flySection
+
+local flyCorner = Instance.new("UICorner")
+flyCorner.CornerRadius = UDim.new(0, 8)
+flyCorner.Parent = flyToggle
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Text = "Speed:"
+speedLabel.Size = UDim2.new(0.25, 0, 0, 25)
+speedLabel.Position = UDim2.new(0.52, 0, 0, 40)
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.fromRGB(180, 200, 255)
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.TextSize = 14
+speedLabel.Parent = flySection
+
+local speedBox = Instance.new("TextBox")
+speedBox.Text = "50"
+speedBox.Size = UDim2.new(0.22, 0, 0, 28)
+speedBox.Position = UDim2.new(0.77, 0, 0, 38)
+speedBox.BackgroundColor3 = Color3.fromRGB(50, 45, 65)
+speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBox.Font = Enum.Font.Gotham
+speedBox.TextSize = 16
+speedBox.Parent = flySection
+
+local speedCorner = Instance.new("UICorner")
+speedCorner.CornerRadius = UDim.new(0, 6)
+speedCorner.Parent = speedBox
+
+local speedStroke = Instance.new("UIStroke")
+speedStroke.Color = Color3.fromRGB(90, 80, 110)
+speedStroke.Thickness = 1.5
+speedStroke.Parent = speedBox
+
+-- Fly Functions
+local function stopFly()
+    flying = false
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.PlatformStand = false
+    end
+    if BodyGyro then
+        BodyGyro:Destroy()
+        BodyGyro = nil
+    end
+    if BodyVelocity then
+        BodyVelocity:Destroy()
+        BodyVelocity = nil
+    end
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    flyToggle.Text = "OFF"
+    flyToggle.BackgroundColor3 = Color3.fromRGB(70, 40, 40)
+    flyToggle.TextColor3 = Color3.fromRGB(255, 200, 200)
+end
+
+local function startFly()
+    local char = player.Character
+    if not char then return end
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    local hum = char:FindFirstChild("Humanoid")
+    if not hum then return end
+
+    stopFly() -- Ensure clean start
+
+    BodyGyro = Instance.new("BodyGyro")
+    BodyGyro.Name = "FlyGyro"
+    BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    BodyGyro.P = 9e4
+    BodyGyro.Parent = rootPart
+
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.Name = "FlyVelocity"
+    BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    BodyVelocity.Parent = rootPart
+
+    hum.PlatformStand = true
+    flying = true
+    flyToggle.Text = "ON"
+    flyToggle.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+    flyToggle.TextColor3 = Color3.fromRGB(200, 255, 200)
+
+    flyConnection = RunService.Heartbeat:Connect(function()
+        if not flying then return end
+        local currentChar = player.Character
+        if not currentChar then
+            stopFly()
+            return
+        end
+        local currentRoot = currentChar:FindFirstChild("HumanoidRootPart")
+        if not currentRoot or not BodyVelocity or not BodyGyro then
+            stopFly()
+            return
+        end
+        local speed = tonumber(speedBox.Text) or 50
+        local cam = workspace.CurrentCamera
+        local dir = Vector3.new(0, 0, 0)
+        if keys.W then dir = dir + cam.CFrame.LookVector end
+        if keys.S then dir = dir - cam.CFrame.LookVector end
+        if keys.A then dir = dir - cam.CFrame.RightVector end
+        if keys.D then dir = dir + cam.CFrame.RightVector end
+        if keys.Space then dir = dir + cam.CFrame.UpVector end
+        if keys.LeftControl then dir = dir - cam.CFrame.UpVector end
+        if dir.Magnitude > 0 then
+            dir = dir.Unit
+        end
+        BodyVelocity.Velocity = dir * speed
+        BodyGyro.CFrame = cam.CFrame
+    end)
+end
+
+flyToggle.MouseButton1Click:Connect(function()
+    if flying then
+        stopFly()
+    else
+        startFly()
+    end
+end)
+
+-- Hover for fly toggle
+flyToggle.MouseEnter:Connect(function()
+    if flying then
+        flyToggle.BackgroundColor3 = Color3.fromRGB(50, 120, 50)
+    else
+        flyToggle.BackgroundColor3 = Color3.fromRGB(90, 50, 50)
+    end
+end)
+flyToggle.MouseLeave:Connect(function()
+    if flying then
+        flyToggle.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+    else
+        flyToggle.BackgroundColor3 = Color3.fromRGB(70, 40, 40)
+    end
+end)
+
+speedBox.Focused:Connect(function()
+    speedBox.BackgroundColor3 = Color3.fromRGB(60, 55, 75)
+end)
+speedBox.FocusLost:Connect(function()
+    speedBox.BackgroundColor3 = Color3.fromRGB(50, 45, 65)
+end)
+
+-- Keybinds for Fly
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if flying then
+        if input.KeyCode == Enum.KeyCode.W then keys.W = true end
+        if input.KeyCode == Enum.KeyCode.S then keys.S = true end
+        if input.KeyCode == Enum.KeyCode.A then keys.A = true end
+        if input.KeyCode == Enum.KeyCode.D then keys.D = true end
+        if input.KeyCode == Enum.KeyCode.Space then keys.Space = true end
+        if input.KeyCode == Enum.KeyCode.LeftControl then keys.LeftControl = true end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gpe)
+    if gpe then return end
+    if flying then
+        if input.KeyCode == Enum.KeyCode.W then keys.W = false end
+        if input.KeyCode == Enum.KeyCode.S then keys.S = false end
+        if input.KeyCode == Enum.KeyCode.A then keys.A = false end
+        if input.KeyCode == Enum.KeyCode.D then keys.D = false end
+        if input.KeyCode == Enum.KeyCode.Space then keys.Space = false end
+        if input.KeyCode == Enum.KeyCode.LeftControl then keys.LeftControl = false end
+    end
+end)
+
+-- Handle respawn
+player.CharacterAdded:Connect(function()
+    wait(0.1) -- Small delay
+    stopFly()
+end)
+
+-- Teleport Function
+local function teleportTo(targetPlayer)
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local rootPart = char.HumanoidRootPart
+    if targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        rootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 5) -- Offset above and side
+        -- Reset velocity if flying
+        if BodyVelocity then
+            BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        end
+    end
+end
+
+-- Teleport Section
+local tpLabel = Instance.new("TextLabel")
+tpLabel.Text = "Teleport to Player"
+tpLabel.Size = UDim2.new(1, -20, 0, 30)
+tpLabel.Position = UDim2.new(0, 10, 0, 95)
+tpLabel.BackgroundTransparency = 1
+tpLabel.TextColor3 = Color3.fromRGB(180, 200, 255)
+tpLabel.Font = Enum.Font.GothamSemibold
+tpLabel.TextSize = 18
+tpLabel.TextXAlignment = Enum.TextXAlignment.Left
+tpLabel.Parent = contentFrame
+
+-- Player List ScrollingFrame
+local playerList = Instance.new("ScrollingFrame")
+playerList.Size = UDim2.new(1, -20, 1, -140)
+playerList.Position = UDim2.new(0, 10, 0, 130)
+playerList.BackgroundColor3 = Color3.fromRGB(35, 30, 50)
+playerList.BorderSizePixel = 0
+playerList.ScrollBarThickness = 6
+playerList.ScrollBarImageColor3 = Color3.fromRGB(100, 150, 255)
+playerList.CanvasSize = UDim2.new(0, 0, 0, 0)
+playerList.Parent = contentFrame
+
+local listCorner = Instance.new("UICorner")
+listCorner.CornerRadius = UDim.new(0, 8)
+listCorner.Parent = playerList
+
+local listStroke = Instance.new("UIStroke")
+listStroke.Color = Color3.fromRGB(70, 60, 90)
+listStroke.Thickness = 1
+listStroke.Parent = playerList
+
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.SortOrder = Enum.SortOrder.Name
+uiListLayout.Padding = UDim.new(0, 4)
+uiListLayout.Parent = playerList
+
+local function updatePlayerList()
+    for _, child in ipairs(playerList:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    local players = {}
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr ~= player then
+            table.insert(players, plr)
+        end
+    end
+    table.sort(players, function(a, b) return a.Name:lower() < b.Name:lower() end)
+    for _, plr in ipairs(players) do
+        local btn = Instance.new("TextButton")
+        btn.Name = plr.Name
+        btn.Text = plr.Name
+        btn.Size = UDim2.new(1, -10, 0, 32)
+        btn.BackgroundColor3 = Color3.fromRGB(50, 45, 65)
+        btn.TextColor3 = Color3.fromRGB(230, 240, 255)
+        btn.Font = Enum.Font.GothamSemibold
+        btn.TextSize = 15
+        btn.BorderSizePixel = 0
+        btn.Parent = playerList
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 6)
+        btnCorner.Parent = btn
+        local btnStroke = Instance.new("UIStroke")
+        btnStroke.Color = Color3.fromRGB(80, 70, 100)
+        btnStroke.Thickness = 1
+        btnStroke.Parent = btn
+        btn.MouseButton1Click:Connect(function()
+            teleportTo(plr)
+        end)
+        btn.MouseEnter:Connect(function()
+            btn.BackgroundColor3 = Color3.fromRGB(70, 60, 90)
+        end)
+        btn.MouseLeave:Connect(function()
+            btn.BackgroundColor3 = Color3.fromRGB(50, 45, 65)
+        end)
+    end
+    playerList.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y + 10)
+end
+
+-- Update player list
+updatePlayerList()
+game.Players.PlayerAdded:Connect(updatePlayerList)
+game.Players.PlayerRemoving:Connect(updatePlayerList)
+
+-- Load Animation
+local loadTweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local loadTween = TweenService:Create(mainFrame, loadTweenInfo, {Position = UDim2.new(0.5, -140, 0.5, -175)})
+loadTween:Play()
